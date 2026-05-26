@@ -1,0 +1,3 @@
+- Username and password fields do not have data-testid attributes.
+- Login button has data-testid="login-button".
+- Recommended improvement: add data-testid to all interactive form fields for test stability.
