@@ -24,10 +24,13 @@ export class EmployeePage {
         // searchBox: 'role=textbox[name*="Search"]',
 
         searchBox: 'input[placeholder="Name or job title..."]',
-        employeeNameHeading: 'h1', // heading level 1 for employee name
-        employeeJobTitle: 'div >> nth=1', // job title under the name block
+        employeeName: 'h1',
+        employeeJobTitle: 'xpath=following-sibling::div[1]',
+        closeModalBtn: 'button[aria-label="Close modal"]',
+        employeesNav: '#main-content >> role=link[name="Employees"]',
+        permissionsNav: '#main-content >> role=link[name="Permissions"]',
         manageEmployeesUrl: /employee-hub\/manage-employees/,
-        employeesNav: '#main-content >> role=link[name="Employees"]'
+        permissionsUrl: /employee-hub\/permissions/
 
     };
 
@@ -47,7 +50,7 @@ export class EmployeePage {
         // -----------------------------
         // LOG EMPLOYEE DATA
         // -----------------------------
-        console.log(`
+        log(`
 ==========================
   EMPLOYEE GENERATED
 ==========================
@@ -83,67 +86,104 @@ Job Title  : ${emp.jobTitle}
     }
 
     async exitForm() {
-        await this.page.keyboard.press('Escape');
+        await this.page.locator(this.selectors.closeModalBtn).click();
+        await this.page.waitForSelector('[role="dialog"]', { state: 'hidden' });
     }
 
     async verifyEmployeesExist(employees) {
         log('Starting employee verification');
 
-        // Navigate to Manage Employees
-        await this.page.locator(this.selectors.employeesNav).click();
-        await this.page.waitForURL(this.selectors.manageEmployeesUrl);
+        await this.navigateToManageEmployees();
 
         for (const emp of employees) {
-            const fullName = `${emp.firstName} ${emp.lastName}`;
-
-            // Pick random search term
-            const terms = [emp.firstName, emp.lastName, emp.jobTitle];
-            const term = terms[Math.floor(Math.random() * terms.length)];
-
-            log(`Searching for employee using term: ${term}`);
-
-            // Search
-            await this.page.locator(this.selectors.searchBox).fill(term);
-            await this.page.waitForTimeout(500);
-
-            // Get all employee name headings returned
-            const nameHeadings = this.page.locator(this.selectors.employeeNameHeading);
-            const count = await nameHeadings.count();
-
-            if (count === 0) {
-                log(`No employees returned for search term: ${term}`);
-                throw new Error(`Employee not found: ${fullName}`);
-            }
-
-            log(`Found ${count} employee record(s). Checking for match`);
-
-            let found = false;
-
-            for (let i = 0; i < count; i++) {
-                const name = await nameHeadings.nth(i).textContent();
-                const jobTitle = await nameHeadings
-                    .nth(i)
-                    .locator('xpath=../div[2]')
-                    .textContent();
-
-                if (
-                    name?.trim() === fullName &&
-                    jobTitle?.trim() === emp.jobTitle.trim()
-                ) {
-                    log(`Employee verified: ${fullName} (${emp.jobTitle})`);
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                log(`Employee NOT found: ${fullName}`);
-                throw new Error(`Employee not found in list: ${fullName}`);
-            }
+            await this.verifyEmployeeExists(emp);
         }
 
         log('All employees verified successfully');
     }
 
+    private async navigateToManageEmployees() {
+        await this.page.locator(this.selectors.employeesNav).click();
+        await this.page.waitForURL(this.selectors.manageEmployeesUrl);
+        await this.page.waitForLoadState('networkidle');
+        log('Now on Manage Employees tab on Hub page with url: ' + this.page.url());
+    }
+
+    private async navigateToPermissions() {
+        await this.page.locator(this.selectors.permissionsNav).click();
+        await this.page.waitForURL(this.selectors.permissionsUrl);
+        await this.page.waitForLoadState('networkidle');
+        log('Now on Permissions tab on Hub page with url: ' + this.page.url());
+    }
+
+    private pickRandomSearchTerm(emp): string {
+        const terms = [emp.firstName, emp.lastName, emp.jobTitle];
+        const pickedTerm = terms[Math.floor(Math.random() * terms.length)];
+        log(`Picked random search term [options: firstName/lastName/jobTitle]: ${pickedTerm}`);
+        return pickedTerm;
+    }
+
+    private async searchForEmployee(term: string) {
+        //To-Do: Need to jump tabs as workaround to get latest list of Employees loaded, this logic needs to be updated
+        await this.navigateToPermissions();
+        await this.navigateToManageEmployees();
+
+        await this.page.locator(this.selectors.searchBox).clear();
+        await this.page.locator(this.selectors.searchBox).fill(term);
+        await expect(this.page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 10_000 });
+
+        // To-Do: Currently using hard wait but later logic can be changed to make it dependent on API response
+        await this.page.waitForTimeout(3000);
+    }
+
+    private async findMatchInResults(fullName: string, jobTitle: string): Promise<boolean> {
+        const names = this.page.getByRole('heading', { level: 1 });
+        const count = await names.count();
+        const employeeResultsHeading = this.page.getByRole('heading', { name: /^Employees \(\d+\)$/, level: 3 });
+
+        if (count < 1) {
+            return false;
+        }
+
+        log(`Found: ${await employeeResultsHeading.textContent()}. Checking for match..`);
+
+        const employeeHeading = this.page.getByRole('heading', {
+            name: fullName,
+            level: 1,
+            exact: true
+        }).first();
+
+        try {
+            await expect(employeeHeading).toBeVisible({ timeout: 10_000 });
+            await expect(employeeHeading).toHaveText(fullName);
+            await expect(employeeHeading.locator(this.selectors.employeeJobTitle)).toHaveText(jobTitle, { timeout: 5_000 });
+            return true;
+        } catch {
+            log('Employee match failed for full name / job title')
+            return false;
+        }
+    }
+
+    private async verifyEmployeeExists(emp) {
+        const fullName = `${emp.firstName} ${emp.lastName}`;
+        const term = this.pickRandomSearchTerm(emp);
+
+        log(`Searching for employee using term: ${term}`);
+
+        await this.searchForEmployee(term);
+
+        const match = await this.findMatchInResults(fullName, emp.jobTitle);
+
+        if (!match) {
+            log(`Employee NOT found: ${fullName}`);
+            throw new Error(`Employee not found in list: ${fullName}`);
+        }
+
+        log(`Employee verified: ${fullName} (${emp.jobTitle})`);
+    }
+
+    async waitForEmployeeModalClose() {
+        await this.page.waitForSelector('text=Add employee', { state: 'visible' });
+    }
 
 }

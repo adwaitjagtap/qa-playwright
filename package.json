@@ -1,0 +1,27 @@
+{
+  "name": "brighthr-qa-playwright",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium-headless",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:headed": "playwright test --project=chromium --headed",
+    "test:auth": "playwright test tests/specs/auth",
+    "test:employees": "playwright test tests/specs/employees",
+    "report": "playwright show-report"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@types/node": "25.9.1"
+  },
+  "dependencies": {
+    "@faker-js/faker": "10.4.0",
+    "dotenv": "17.4.2"
+  }
+}

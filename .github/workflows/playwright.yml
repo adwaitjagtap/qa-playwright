@@ -1,0 +1,62 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 20 * * *'   # Nightly at 20:00 UTC (UK 8pm GMT / 9pm BST)
+    - cron: '0 8 * * *'    # Nightly at 08:00 UTC (UK 8am GMT / 9am BST)
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Browser project to run (e.g. chromium-headless, firefox, webkit). Leave blank to run default.'
+        required: false
+        default: 'chromium-headless'
+
+jobs:
+  test:
+    name: Playwright Tests (${{ github.event.inputs.project || 'chromium-headless' }})
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+
+    env:
+      BRIGHTHR_USERNAME: ${{ secrets.BRIGHTHR_USERNAME }}
+      BRIGHTHR_PASSWORD: ${{ secrets.BRIGHTHR_PASSWORD }}
+      CI: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npx playwright test --project=${{ github.event.inputs.project || 'chromium-headless' }}
+
+      - name: Upload Playwright HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts (screenshots, videos, traces, HAR)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-failures
+          path: test-results/
+          retention-days: 7

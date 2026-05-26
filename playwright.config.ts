@@ -30,7 +30,11 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [['html', { open: 'never' }]],
+  reporter: process.env.CI
+    ? [['html', { open: 'never' }], ['github'], ['list']]
+    : [['html', { open: 'never' }]],
+  /* Note: 'list' reporter is intentionally excluded locally — it causes console.log output to be printed
+     twice (once from the worker, once echoed by the reporter). It is kept in CI for GitHub Actions log visibility. */
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
@@ -41,9 +45,10 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     screenshot: 'only-on-failure',
     /* screenshot only for failures */
-    video: 'retain-on-failure'
+    video: 'retain-on-failure',
     /* video tracing only for failures */
-
+    har: { omitContent: false },
+    /* HAR network capture - filtered to failures only via custom fixture */
   },
 
   /* Configure projects for major browsers */
