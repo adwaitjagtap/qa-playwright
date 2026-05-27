@@ -74,7 +74,8 @@ Job Title  : ${emp.jobTitle}
         // Select today's date
         await this.page.locator(this.selectors.datePicker).click();
         const today = new Date().getDate().toString();
-        await this.page.getByText(today, { exact: true }).click();
+        const dayLocator = this.page.getByText(today, { exact: true });
+        await ((await dayLocator.count()) > 1 ? dayLocator.last() : dayLocator).click();
     }
 
     async saveEmployee() {
