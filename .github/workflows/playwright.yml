@@ -6,8 +6,9 @@ on:
   pull_request:
     branches: [main, master]
   schedule:
-    - cron: '0 20 * * *'   # Nightly at 20:00 UTC (UK 8pm GMT / 9pm BST)
-    - cron: '0 8 * * *'    # Nightly at 08:00 UTC (UK 8am GMT / 9am BST)
+    - cron: '0 14 * * 1'   # Weekly on Monday at 14:00 UTC (UK 3pm BST / 2pm GMT)
+    #- cron: '0 20 * * *'   # Nightly at 20:00 UTC (UK 8pm GMT / 9pm BST)
+    #- cron: '0 8 * * *'    # Nightly at 08:00 UTC (UK 8am GMT / 9am BST)
   workflow_dispatch:
     inputs:
       project:
